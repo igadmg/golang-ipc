@@ -14,10 +14,11 @@ import (
 )
 
 var defaultSocketBasePath = "/tmp/"
+var defaultSocketExt = ".sock"
 
 // Server create a unix socket and start listening connections - for unix and linux
 func (s *Server) run() error {
-	socketPath := filepath.Join(s.conf.SocketBasePath, s.name+".sock")
+	socketPath := filepath.Join(s.conf.SocketBasePath, s.Name+defaultSocketExt)
 
 	if err := os.RemoveAll(socketPath); err != nil {
 		return err
@@ -44,7 +45,7 @@ func (s *Server) run() error {
 
 // Client connect to the unix socket created by the server -  for unix and linux
 func (c *Client) dial() error {
-	socketPath := filepath.Join(c.conf.SocketBasePath, c.Name+".sock")
+	socketPath := filepath.Join(c.conf.SocketBasePath, c.Name+defaultSocketExt)
 	startTime := time.Now()
 
 	for {
