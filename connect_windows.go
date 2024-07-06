@@ -40,7 +40,7 @@ func (s *Server) run() error {
 // Client function
 // dial - attempts to connect to a named pipe created by the server
 func (c *Client) dial() error {
-	socketPath := filepath.Join(c.conf.SocketBasePath, c.name)
+	socketPath := filepath.Join(c.conf.SocketBasePath, c.Name)
 	startTime := time.Now()
 
 	for {
