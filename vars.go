@@ -11,7 +11,7 @@ const (
 )
 
 var (
-	defaultServerConfig = ServerConfig{
+	DefaultServerConfig = ServerConfig{
 		SocketBasePath:    defaultSocketBasePath,
 		Timeout:           0,
 		MaxMsgSize:        defaultMaxMsgSize,
@@ -19,7 +19,7 @@ var (
 		UnmaskPermissions: false,
 	}
 
-	defaultClientConfig = ClientConfig{
+	DefaultClientConfig = ClientConfig{
 		SocketBasePath: defaultSocketBasePath,
 		Timeout:        0,
 		RetryTimer:     defaultRetryTimer,

@@ -14,7 +14,6 @@ func StartClient(ipcName string, config *ClientConfig) (*Client, error) {
 	err := checkIpcName(ipcName)
 	if err != nil {
 		return nil, err
-
 	}
 
 	cc := &Client{
@@ -25,45 +24,20 @@ func StartClient(ipcName string, config *ClientConfig) (*Client, error) {
 	}
 
 	if config == nil {
-		cc.conf = defaultClientConfig
+		cc.conf = DefaultClientConfig
 	} else {
 		cc.conf = *config
 	}
 
 	if cc.conf.Timeout < 0 {
-		cc.conf.Timeout = defaultClientConfig.Timeout
+		cc.conf.Timeout = DefaultClientConfig.Timeout
 	}
 	if cc.conf.RetryTimer <= 0 {
-		cc.conf.RetryTimer = defaultClientConfig.RetryTimer
+		cc.conf.RetryTimer = DefaultClientConfig.RetryTimer
 	}
 	if cc.conf.SocketBasePath == "" {
-		cc.conf.SocketBasePath = defaultClientConfig.SocketBasePath
+		cc.conf.SocketBasePath = DefaultClientConfig.SocketBasePath
 	}
-
-	// 	cc.timeout = 0
-	// 	cc.retryTimer = time.Duration(20)
-	// 	cc.encryptionReq = true
-
-	// } else {
-
-	// 	if config.Timeout < 0 {
-	// 		cc.timeout = 0
-	// 	} else {
-	// 		cc.timeout = config.Timeout
-	// 	}
-
-	// 	if config.RetryTimer < 1 {
-	// 		cc.retryTimer = time.Duration(1)
-	// 	} else {
-	// 		cc.retryTimer = time.Duration(config.RetryTimer)
-	// 	}
-
-	// 	if !config.Encryption {
-	// 		cc.encryptionReq = false
-	// 	} else {
-	// 		cc.encryptionReq = true // defualt is to always enforce encryption
-	// 	}
-	// }
 
 	go startClient(cc)
 
@@ -97,9 +71,7 @@ func (c *Client) read() {
 		}
 
 		mLen := bytesToInt(bLen)
-
 		msgRecvd := make([]byte, mLen)
-
 		res = c.readData(msgRecvd)
 		if !res {
 			break
@@ -131,10 +103,10 @@ func (c *Client) readData(buff []byte) bool {
 	if err != nil {
 		if strings.Contains(err.Error(), "EOF") { // the connection has been closed by the client.
 			c.conn.Close()
-
 			if c.status != Closing || c.status == Closed {
 				go c.reconnect()
 			}
+
 			return false
 		}
 
@@ -142,6 +114,7 @@ func (c *Client) readData(buff []byte) bool {
 			c.status = Closed
 			c.received <- &Message{Status: c.status.String(), MsgType: -1}
 			c.received <- &Message{Err: errors.New("client has closed the connection"), MsgType: -2}
+
 			return false
 		}
 
@@ -150,13 +123,11 @@ func (c *Client) readData(buff []byte) bool {
 	}
 
 	return true
-
 }
 
 func (c *Client) reconnect() {
 	c.status = ReConnecting
 	c.received <- &Message{Status: c.status.String(), MsgType: -1}
-
 	err := c.dial() // connect to the pipe
 	if err != nil {
 		if err.Error() == "timed out trying to connect" {
@@ -185,6 +156,7 @@ func (c *Client) Read() (*Message, error) {
 	if m.Err != nil {
 		close(c.received)
 		close(c.sent)
+
 		return nil, m.Err
 	}
 
@@ -213,10 +185,9 @@ func (c *Client) Write(msgType int, message []byte) error {
 }
 
 func (c *Client) write() {
+	var err error
 	for {
-		var err error
 		m, ok := <-c.sent
-
 		if !ok {
 			break
 		}
@@ -229,6 +200,7 @@ func (c *Client) write() {
 			toSend, err = encrypt(*c.enc.cipher, toSend)
 			if err != nil {
 				log.Println("error encrypting data", err)
+
 				continue
 			}
 		} else {
@@ -237,28 +209,18 @@ func (c *Client) write() {
 
 		writer.Write(intToBytes(len(toSend)))
 		writer.Write(toSend)
-
 		err = writer.Flush()
 		if err != nil {
 			log.Println("error flushing data", err)
+
 			continue
 		}
 	}
 }
 
-// getStatus - get the current status of the connection
-func (c *Client) getStatus() Status {
-	return c.status
-}
-
 // StatusCode - returns the current connection status
-func (c *Client) StatusCode() Status {
+func (c *Client) Status() Status {
 	return c.status
-}
-
-// Status - returns the current connection status as a string
-func (c *Client) Status() string {
-	return c.status.String()
 }
 
 // Close - closes the connection

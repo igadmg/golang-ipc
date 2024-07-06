@@ -18,26 +18,26 @@ func StartServer(ipcName string, config *ServerConfig) (*Server, error) {
 	}
 
 	s := &Server{
-		name:     ipcName,
+		Name:     ipcName,
 		status:   NotConnected,
 		received: make(chan *Message),
 		sent:     make(chan *Message),
 	}
 
 	if config == nil {
-		s.conf = defaultServerConfig
+		s.conf = DefaultServerConfig
 	} else {
 		s.conf = *config
 	}
 
 	if s.conf.Timeout < 0 {
-		s.conf.Timeout = defaultServerConfig.Timeout
+		s.conf.Timeout = DefaultServerConfig.Timeout
 	}
 	if s.conf.MaxMsgSize < minMsgSize {
-		s.conf.MaxMsgSize = defaultServerConfig.MaxMsgSize
+		s.conf.MaxMsgSize = DefaultServerConfig.MaxMsgSize
 	}
 	if s.conf.SocketBasePath == "" {
-		s.conf.SocketBasePath = defaultServerConfig.SocketBasePath
+		s.conf.SocketBasePath = DefaultServerConfig.SocketBasePath
 	}
 
 	err = s.run()
@@ -211,6 +211,7 @@ func (s *Server) Write(msgType int, message []byte) error {
 }
 
 func (s *Server) write() {
+	var err error
 	for {
 		m, ok := <-s.sent
 		if !ok {
@@ -222,23 +223,22 @@ func (s *Server) write() {
 
 		if s.conf.Encryption {
 			toSend = append(toSend, m.Data...)
-			toSendEnc, err := encrypt(*s.enc.cipher, toSend)
+			toSend, err = encrypt(*s.enc.cipher, toSend)
 			if err != nil {
 				log.Println("error encrypting data", err)
+
 				continue
 			}
-
-			toSend = toSendEnc
 		} else {
 			toSend = append(toSend, m.Data...)
 		}
 
 		writer.Write(intToBytes(len(toSend)))
 		writer.Write(toSend)
-
-		err := writer.Flush()
+		err = writer.Flush()
 		if err != nil {
 			log.Println("error flushing data", err)
+
 			continue
 		}
 

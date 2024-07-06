@@ -8,7 +8,7 @@ import (
 
 // Server - holds the details of the server connection & config.
 type Server struct {
-	name      string
+	Name      string
 	listen    net.Listener
 	conn      net.Conn
 	status    Status

@@ -18,7 +18,7 @@ var defaultSocketBasePath = `\\.\pipe\`
 // Create the named pipe (if it doesn't already exist) and start listening for a client to connect.
 // when a client connects and connection is accepted the read function is called on a go routine.
 func (s *Server) run() error {
-	socketPath := filepath.Join(s.conf.SocketBasePath, s.name)
+	socketPath := filepath.Join(s.conf.SocketBasePath, s.Name)
 	var config *winio.PipeConfig
 
 	if s.conf.UnmaskPermissions {

@@ -4,7 +4,6 @@ import "errors"
 
 // returns the status of the connection as a string
 func (status *Status) String() string {
-
 	switch *status {
 	case NotConnected:
 		return "Not Connected"
@@ -33,7 +32,6 @@ func (status *Status) String() string {
 
 // checks the name passed into the start function to ensure it's ok/will work.
 func checkIpcName(ipcName string) error {
-
 	if len(ipcName) == 0 {
 		return errors.New("ipcName cannot be an empty string")
 	}
