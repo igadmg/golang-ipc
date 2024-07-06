@@ -5,79 +5,69 @@ package ipc
 
 import (
 	"errors"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/Microsoft/go-winio"
 )
 
+var defaultSocketBasePath = `\\.\pipe\`
+
 // Server function
 // Create the named pipe (if it doesn't already exist) and start listening for a client to connect.
 // when a client connects and connection is accepted the read function is called on a go routine.
-func (sc *Server) run() error {
+func (s *Server) run() error {
+	socketPath := filepath.Join(s.conf.SocketBasePath, s.name)
+	var config *winio.PipeConfig
 
-	var pipeBase = `\\.\pipe\`
+	if s.conf.UnmaskPermissions {
+		config = &winio.PipeConfig{SecurityDescriptor: "D:P(A;;GA;;;AU)"}
+	}
 
-	listen, err := winio.ListenPipe(pipeBase+sc.name, nil)
+	listen, err := winio.ListenPipe(socketPath, config)
 	if err != nil {
-
 		return err
 	}
 
-	sc.listen = listen
-
-	sc.status = Listening
-
-	sc.connChannel = make(chan bool)
-
-	go sc.acceptLoop()
-
-	err2 := sc.connectionTimer()
-	if err2 != nil {
-		return err2
-	}
+	s.listen = listen
+	s.status = Listening
+	go s.acceptLoop()
 
 	return nil
-
 }
 
 // Client function
 // dial - attempts to connect to a named pipe created by the server
-func (cc *Client) dial() error {
-
-	var pipeBase = `\\.\pipe\`
-
+func (c *Client) dial() error {
+	socketPath := filepath.Join(c.conf.SocketBasePath, c.name)
 	startTime := time.Now()
 
 	for {
-		if cc.conf.Timeout != 0 {
-			if time.Now().After(startTime.Add(cc.conf.Timeout)) {
-				cc.status = Closed
-				return errors.New("Timed out trying to connect")
+		if c.conf.Timeout != 0 {
+			if time.Since(startTime) > c.conf.Timeout {
+				c.status = Closed
+				return errors.New("timed out trying to connect")
 			}
 		}
 
-		pn, err := winio.DialPipe(pipeBase+cc.Name, nil)
+		pn, err := winio.DialPipe(socketPath, nil)
 		if err != nil {
-
-			if strings.Contains(err.Error(), "The system cannot find the file specified.") == true {
-
+			if strings.Contains(err.Error(), "the system cannot find the file specified.") == true {
 			} else {
 				return err
 			}
-
 		} else {
+			c.conn = pn
 
-			cc.conn = pn
-
-			err = cc.handshake()
+			err = c.handshake()
 			if err != nil {
 				return err
 			}
+
 			return nil
 		}
 
-		time.Sleep(cc.conf.RetryTimer * time.Second)
-
+		time.Sleep(c.conf.RetryTimer * time.Second)
 	}
 }

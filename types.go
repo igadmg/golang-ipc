@@ -8,78 +8,78 @@ import (
 
 // Server - holds the details of the server connection & config.
 type Server struct {
-	name        string
-	listen      net.Listener
-	conn        net.Conn
-	status      Status
-	received    chan (*Message)
-	connChannel chan bool
-	toWrite     chan (*Message)
-	enc         *encryption
-	conf        ServerConfig
+	name      string
+	listen    net.Listener
+	conn      net.Conn
+	status    Status
+	connected chan bool // ?
+	received  chan (*Message)
+	sent      chan (*Message)
+	enc       *encryption
+	conf      ServerConfig
 }
 
 // Client - holds the details of the client connection and config.
 type Client struct {
-	Name       string
-	conn       net.Conn
-	status     Status
-	received   chan (*Message)
-	toWrite    chan (*Message)
-	encryption bool
-	maxMsgSize int
-	enc        *encryption
-	conf       ClientConfig
+	Name     string
+	conn     net.Conn
+	status   Status
+	received chan (*Message)
+	sent     chan (*Message)
+	enc      *encryption
+	conf     ClientConfig
 }
 
 // Message - contains the  received message
 type Message struct {
-	err     error  // details of any error
-	MsgType int    // type of message sent - 0 is reserved
+	Err     error  // details of any error
+	MsgType int    // 0 = reserved , -1 is an internal message (disconnection or error etc), all messages recieved will be > 0
 	Data    []byte // message data received
-	Status  string
+	Status  string // the status of the connection
 }
 
 // Status - Status of the connection
 type Status int
 
 const (
-
 	// NotConnected - 0
 	NotConnected Status = iota
 	// Listening - 1
-	Listening Status = iota
+	Listening
 	// Connecting - 2
-	Connecting Status = iota
+	Connecting
 	// Connected - 3
-	Connected Status = iota
+	Connected
 	// ReConnecting - 4
-	ReConnecting Status = iota
+	ReConnecting
 	// Closed - 5
-	Closed Status = iota
+	Closed
 	// Closing - 6
-	Closing Status = iota
+	Closing
 	// Error - 7
-	Error Status = iota
+	Error
 	// Timeout - 8
-	Timeout Status = iota
+	Timeout
+	// Disconnected - 9
+	Disconnected
 )
 
 // ServerConfig - used to pass configuration overrides to ServerStart()
 type ServerConfig struct {
+	SocketBasePath    string
 	Timeout           time.Duration
 	MaxMsgSize        int
 	Encryption        bool
 	UnmaskPermissions bool
-	SocketBasePath    string
 }
 
 // ClientConfig - used to pass configuration overrides to ClientStart()
 type ClientConfig struct {
-	Timeout            time.Duration
-	RetryTimer         time.Duration
-	EncryptionRequired bool
-	SocketBasePath     string
+	SocketBasePath string
+	Timeout        time.Duration
+	RetryTimer     time.Duration
+	MaxMsgSize     int
+	Encryption     bool
 }
 
 // Encryption - encryption settings

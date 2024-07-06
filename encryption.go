@@ -13,7 +13,6 @@ import (
 )
 
 func (sc *Server) keyExchange() ([32]byte, error) {
-
 	var shared [32]byte
 
 	priv, pub, err := generateKeys()
@@ -27,22 +26,19 @@ func (sc *Server) keyExchange() ([32]byte, error) {
 		return shared, err
 	}
 
-	// receive clients public key
+	// received clients public key
 	pubRecvd, err := recvPublic(sc.conn)
 	if err != nil {
 		return shared, err
 	}
 
 	b, _ := pubRecvd.Curve.ScalarMult(pubRecvd.X, pubRecvd.Y, priv.D.Bytes())
-
 	shared = sha256.Sum256(b.Bytes())
 
 	return shared, nil
-
 }
 
 func (cc *Client) keyExchange() ([32]byte, error) {
-
 	var shared [32]byte
 
 	priv, pub, err := generateKeys()
@@ -50,7 +46,7 @@ func (cc *Client) keyExchange() ([32]byte, error) {
 		return shared, err
 	}
 
-	// receive servers public key
+	// received servers public key
 	pubRecvd, err := recvPublic(cc.conn)
 	if err != nil {
 		return shared, err
@@ -63,31 +59,26 @@ func (cc *Client) keyExchange() ([32]byte, error) {
 	}
 
 	b, _ := pubRecvd.Curve.ScalarMult(pubRecvd.X, pubRecvd.Y, priv.D.Bytes())
-
 	shared = sha256.Sum256(b.Bytes())
 
 	return shared, nil
 }
 
 func generateKeys() (*ecdsa.PrivateKey, *ecdsa.PublicKey, error) {
-
 	priva, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	puba := &priva.PublicKey
-
-	if priva.IsOnCurve(puba.X, puba.Y) == false {
+	if !priva.IsOnCurve(puba.X, puba.Y) {
 		return nil, nil, errors.New("keys created arn't on curve")
 	}
 
 	return priva, puba, err
-
 }
 
 func sendPublic(conn net.Conn, pub *ecdsa.PublicKey) error {
-
 	pubSend := publicKeyToBytes(pub)
 	if pubSend == nil {
 		return errors.New("public key cannot be converted to bytes")
@@ -102,11 +93,10 @@ func sendPublic(conn net.Conn, pub *ecdsa.PublicKey) error {
 }
 
 func recvPublic(conn net.Conn) (*ecdsa.PublicKey, error) {
-
-	buff := make([]byte, 300)
+	buff := make([]byte, 98)
 	i, err := conn.Read(buff)
 	if err != nil {
-		return nil, errors.New("didn't receive public key")
+		return nil, errors.New("didn't received public key")
 	}
 
 	if i != 97 {
@@ -114,16 +104,14 @@ func recvPublic(conn net.Conn) (*ecdsa.PublicKey, error) {
 	}
 
 	recvdPub := bytesToPublicKey(buff[:i])
-
-	if recvdPub.IsOnCurve(recvdPub.X, recvdPub.Y) == false {
-		return nil, errors.New("didn't receive valid public key")
+	if !recvdPub.IsOnCurve(recvdPub.X, recvdPub.Y) {
+		return nil, errors.New("didn't received valid public key")
 	}
 
 	return recvdPub, nil
 }
 
 func publicKeyToBytes(pub *ecdsa.PublicKey) []byte {
-
 	if pub == nil || pub.X == nil || pub.Y == nil {
 		return nil
 	}
@@ -132,20 +120,16 @@ func publicKeyToBytes(pub *ecdsa.PublicKey) []byte {
 }
 
 func bytesToPublicKey(recvdPub []byte) *ecdsa.PublicKey {
-
 	if len(recvdPub) == 0 {
 		return nil
 	}
 
 	x, y := elliptic.Unmarshal(elliptic.P384(), recvdPub)
 	return &ecdsa.PublicKey{Curve: elliptic.P384(), X: x, Y: y}
-
 }
 
 func createCipher(shared [32]byte) (*cipher.AEAD, error) {
-
 	b, err := aes.NewCipher(shared[:])
-
 	if err != nil {
 		return nil, err
 	}
@@ -159,19 +143,13 @@ func createCipher(shared [32]byte) (*cipher.AEAD, error) {
 }
 
 func encrypt(g cipher.AEAD, data []byte) ([]byte, error) {
-
 	nonce := make([]byte, g.NonceSize())
+	_, err := io.ReadFull(rand.Reader, nonce)
 
-	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
-		return nil, err
-	}
-
-	return g.Seal(nonce, nonce, data, nil), nil
-
+	return g.Seal(nonce, nonce, data, nil), err
 }
 
 func decrypt(g cipher.AEAD, recdData []byte) ([]byte, error) {
-
 	nonceSize := g.NonceSize()
 	if len(recdData) < nonceSize {
 		return nil, errors.New("not enough data to decrypt")
@@ -184,5 +162,4 @@ func decrypt(g cipher.AEAD, recdData []byte) ([]byte, error) {
 	}
 
 	return plain, nil
-
 }

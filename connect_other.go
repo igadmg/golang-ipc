@@ -13,75 +13,59 @@ import (
 	"time"
 )
 
+var defaultSocketBasePath = "/tmp/"
+
 // Server create a unix socket and start listening connections - for unix and linux
-func (sc *Server) run() error {
-	socketPath := filepath.Join(sc.conf.SocketBasePath, sc.name+".sock")
+func (s *Server) run() error {
+	socketPath := filepath.Join(s.conf.SocketBasePath, s.name+".sock")
 
 	if err := os.RemoveAll(socketPath); err != nil {
 		return err
 	}
 
-	var oldUmask int
-	if sc.conf.UnmaskPermissions {
-		oldUmask = syscall.Umask(0)
+	if s.conf.UnmaskPermissions {
+		defer syscall.Umask(syscall.Umask(0))
 	}
 
 	listen, err := net.Listen("unix", socketPath)
-
-	if sc.conf.UnmaskPermissions {
-		syscall.Umask(oldUmask)
-	}
-
 	if err != nil {
 		return err
 	}
 
-	sc.listen = listen
+	s.listen = listen
 
-	sc.status = Listening
-	sc.received <- &Message{Status: sc.status.String(), MsgType: -1}
-	sc.connChannel = make(chan bool)
-
-	go sc.acceptLoop()
-
-	err = sc.connectionTimer()
-	if err != nil {
-		return err
-	}
+	go s.acceptLoop()
+	s.status = Listening
+	//sc.received <- &Message{Status: sc.status.String(), MsgType: -1}
+	//sc.connChannel = make(chan bool)
 
 	return nil
-
 }
 
 // Client connect to the unix socket created by the server -  for unix and linux
-func (cc *Client) dial() error {
-	socketPath := filepath.Join(cc.conf.SocketBasePath, cc.Name+".sock")
-
+func (c *Client) dial() error {
+	socketPath := filepath.Join(c.conf.SocketBasePath, c.Name+".sock")
 	startTime := time.Now()
 
 	for {
-		if cc.conf.Timeout != 0 {
-			if time.Now().After(startTime.Add(cc.conf.Timeout)) {
-				cc.status = Closed
-				return errors.New("Timed out trying to connect")
+		if c.conf.Timeout != 0 {
+			if time.Since(startTime) > c.conf.Timeout {
+				c.status = Closed
+				return errors.New("timed out trying to connect")
 			}
 		}
 
 		conn, err := net.Dial("unix", socketPath)
 		if err != nil {
-			if strings.Contains(err.Error(), "connect: no such file or directory") == true {
-
-			} else if strings.Contains(err.Error(), "connect: connection refused") == true {
-
+			if strings.Contains(err.Error(), "connect: no such file or directory") {
+			} else if strings.Contains(err.Error(), "connect: connection refused") {
 			} else {
-				cc.received <- &Message{err: err, MsgType: -2}
+				c.received <- &Message{Err: err, MsgType: -1}
 			}
-
 		} else {
+			c.conn = conn
 
-			cc.conn = conn
-
-			err = cc.handshake()
+			err = c.handshake()
 			if err != nil {
 				return err
 			}
@@ -89,8 +73,6 @@ func (cc *Client) dial() error {
 			return nil
 		}
 
-		time.Sleep(cc.conf.RetryTimer)
-
+		time.Sleep(c.conf.RetryTimer * time.Second)
 	}
-
 }

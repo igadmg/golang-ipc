@@ -1,7 +1,12 @@
-module github.com/justakit/golang-ipc
+module github.com/igadmg/golang-ipc
 
-go 1.18
+go 1.21
 
-require github.com/Microsoft/go-winio v0.5.2
+toolchain go1.22.4
 
-require golang.org/x/sys v0.0.0-20220517195934-5e4e11fc645e // indirect
+require (
+	github.com/Microsoft/go-winio v0.6.2
+	github.com/james-barrow/golang-ipc v1.2.4
+)
+
+require golang.org/x/sys v0.22.0 // indirect
