@@ -4,7 +4,10 @@ import "errors"
 
 // returns the status of the connection as a string
 func (status *Status) String() string {
-	switch *status {
+	return StatusString(*status)
+}
+func StatusString(status Status) string {
+	switch status {
 	case NotConnected:
 		return "Not Connected"
 	case Connecting:

@@ -2,7 +2,7 @@ package ipc
 
 import "time"
 
-const version = 2 // ipc package version
+const ipcVersion = 2 // ipc ipcVersion for assuring message compatibility
 
 const (
 	minMsgSize        = 1024
