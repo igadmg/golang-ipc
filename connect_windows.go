@@ -5,6 +5,7 @@ package ipc
 
 import (
 	"errors"
+	log "github.com/igadmg/golang-ipc/ipclogging"
 	"path/filepath"
 	"strings"
 	"time"
@@ -14,10 +15,9 @@ import (
 
 var defaultSocketBasePath = `\\.\pipe\`
 
-// Server function
 // Create the named pipe (if it doesn't already exist) and start listening for a client to connect.
-// when a client connects and connection is accepted the read function is called on a go routine.
-func (s *Server) run() error {
+// when a client connects and connection is accepted the serverReadDataFromConnectionToIncomingChannel function is called on a go routine.
+func (s *Server) runServer() error {
 	socketPath := filepath.Join(s.conf.SocketBasePath, s.Name)
 	var config *winio.PipeConfig
 
@@ -32,12 +32,12 @@ func (s *Server) run() error {
 
 	s.listen = listen
 	s.status = Listening
-	go s.acceptLoop()
+	log.Debugln("server ok connected to namedPipe ... now entering accept loop")
+	go s.acceptClientConnectionsLoop()
 
 	return nil
 }
 
-// Client function
 // dial - attempts to connect to a named pipe created by the server
 func (c *Client) dial() error {
 	socketPath := filepath.Join(c.conf.SocketBasePath, c.Name)
@@ -47,20 +47,21 @@ func (c *Client) dial() error {
 		if c.conf.Timeout != 0 {
 			if time.Since(startTime) > c.conf.Timeout {
 				c.status = Closed
-				return errors.New("timed out trying to connect")
+				return errors.New("client timed out trying to connect")
 			}
 		}
 
-		pn, err := winio.DialPipe(socketPath, nil)
+		namedPipe, err := winio.DialPipe(socketPath, nil)
 		if err != nil {
-			if strings.Contains(err.Error(), "the system cannot find the file specified.") == true {
+			if strings.Contains(err.Error(), "client the system cannot find the file specified.") == true {
 			} else {
 				return err
 			}
 		} else {
-			c.conn = pn
+			c.conn = namedPipe
 
-			err = c.handshake()
+			log.Debugln("client connected to server namedPipe ... now waiting for server handshake")
+			err = c.clientHandshake()
 			if err != nil {
 				return err
 			}

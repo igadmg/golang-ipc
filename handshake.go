@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	log "github.com/igadmg/golang-ipc/ipclogging"
 )
 
-// 1st message sent from the server
-// byte 0 = protocal version no.
-// byte 1 = whether encryption is to be used - 0 no , 1 = encryption
-func (s *Server) handshake() error {
-	err := s.one()
+// 1st message outgoing from the server
+// byte 0 = protocol ipcVersion number.
+// byte 1 = whether encryption is to be used: 0 = not-encrypted , 1 = encrypted
+func (s *Server) serverHandshakeWithClient() error {
+	err := s.serverSendAndReceiveHandshakeMessage()
 	if err != nil {
 		return err
 	}
@@ -30,25 +31,29 @@ func (s *Server) handshake() error {
 	return nil
 }
 
-func (s *Server) one() error {
+func (s *Server) serverSendAndReceiveHandshakeMessage() error {
 	buff := make([]byte, 2)
-	buff[0] = byte(version)
+	buff[0] = byte(ipcVersion)
 
 	if s.conf.Encryption {
-		buff[1] = byte(1)
+		buff[1] = byte(Encrypted)
 	} else {
-		buff[1] = byte(0)
+		buff[1] = byte(Plain)
 	}
 
 	_, err := s.conn.Write(buff)
 	if err != nil {
-		return errors.New("unable to send handshake ")
+		return errors.New("server unable to send handshake ")
+	} else {
+		log.Debugln("server ok sent handshake")
 	}
 
 	recv := make([]byte, 1)
 	_, err = s.conn.Read(recv)
 	if err != nil {
-		return errors.New("failed to received handshake reply")
+		return errors.New("server failed to received handshake reply")
+	} else {
+		log.Debugf("server ok received handshake: %d", recv[0])
 	}
 
 	switch result := recv[0]; result {
@@ -63,7 +68,7 @@ func (s *Server) one() error {
 
 	}
 
-	return errors.New("other error - handshake failed")
+	return errors.New("server other error - handshake failed")
 }
 
 func (s *Server) startEncryption() error {
@@ -106,21 +111,21 @@ func (s *Server) msgLength() error {
 
 	_, err := s.conn.Write(toSend)
 	if err != nil {
-		return errors.New("unable to send max message length ")
+		return errors.New("server unable to send max message length")
 	}
 
 	reply := make([]byte, 1)
 	_, err = s.conn.Read(reply)
 	if err != nil {
-		return errors.New("did not received message length reply")
+		return errors.New("server did not received message length reply")
 	}
 
 	return nil
 }
 
-// 1st message received by the client
-func (c *Client) handshake() error {
-	err := c.one()
+// 1st message incoming by the client
+func (c *Client) clientHandshake() error {
+	err := c.clientReceiveAndSendHandshakeMessage()
 	if err != nil {
 		return err
 	}
@@ -140,30 +145,33 @@ func (c *Client) handshake() error {
 	return nil
 }
 
-func (c *Client) one() error {
+func (c *Client) clientReceiveAndSendHandshakeMessage() error {
 	recv := make([]byte, 2)
 	_, err := c.conn.Read(recv)
 	if err != nil {
-		return errors.New("failed to received handshake message")
+		return errors.New("client failed to received handshake message")
+	} else {
+		log.Debugf("client received handshake (version/encryption): (%d/%d)", recv[0], recv[1])
 	}
 
-	if recv[0] != version {
-		c.handshakeSendReply(1)
-		return errors.New("server has sent a different version number")
+	if recv[0] != ipcVersion {
+		c.handshakeSendReply(IpcVersionMismatch)
+		return errors.New("client server has sent a different ipcVersion number")
 	}
 
-	if recv[1] != 1 && c.conf.Encryption {
-		c.handshakeSendReply(2)
-		return errors.New("server tried to connect without encryption")
+	if recv[1] == byte(Plain) && c.conf.Encryption {
+		c.handshakeSendReply(ClientEncryptedServerNot)
+		return errors.New("client server communicates unencrypted/plain, client wants encrypted communication")
 	}
 
-	if recv[1] == 0 {
+	if recv[1] == byte(Plain) {
 		c.conf.Encryption = false
 	} else {
 		c.conf.Encryption = true
 	}
 
-	c.handshakeSendReply(0) // 0 is ok
+	log.Debugln("client sending handshakeOk")
+	c.handshakeSendReply(HandshakeOk) // 0 is ok
 	return nil
 }
 
@@ -191,7 +199,7 @@ func (c *Client) msgLength() error {
 	buff := make([]byte, 4)
 	_, err := c.conn.Read(buff)
 	if err != nil {
-		return errors.New("failed to received max message length 1")
+		return errors.New("client failed to received max message length 1")
 	}
 
 	var msgLen uint32
@@ -200,13 +208,13 @@ func (c *Client) msgLength() error {
 	buff = make([]byte, int(msgLen))
 	_, err = c.conn.Read(buff)
 	if err != nil {
-		return errors.New("failed to received max message length 2")
+		return errors.New("client failed to received max message length 2")
 	}
 	var buff2 []byte
 	if c.conf.Encryption {
 		buff2, err = decrypt(*c.enc.cipher, buff)
 		if err != nil {
-			return errors.New("failed to received max message length 3")
+			return errors.New("client failed to received max message length 3")
 		}
 	} else {
 		buff2 = buff
@@ -221,9 +229,9 @@ func (c *Client) msgLength() error {
 	return nil
 }
 
-func (c *Client) handshakeSendReply(result byte) {
+func (c *Client) handshakeSendReply(result HandshakeResult) {
 	buff := make([]byte, 1)
-	buff[0] = result
+	buff[0] = byte(result)
 
 	c.conn.Write(buff)
 }

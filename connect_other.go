@@ -5,6 +5,7 @@ package ipc
 
 import (
 	"errors"
+	log "github.com/igadmg/golang-ipc/ipclogging"
 	"net"
 	"os"
 	"path/filepath"
@@ -17,7 +18,7 @@ var defaultSocketBasePath = "/tmp/"
 var defaultSocketExt = ".sock"
 
 // Server create a unix socket and start listening connections - for unix and linux
-func (s *Server) run() error {
+func (s *Server) runServer() error {
 	socketPath := filepath.Join(s.conf.SocketBasePath, s.Name+defaultSocketExt)
 
 	if err := os.RemoveAll(socketPath); err != nil {
@@ -34,10 +35,10 @@ func (s *Server) run() error {
 	}
 
 	s.listen = listen
-
-	go s.acceptLoop()
 	s.status = Listening
-	//sc.received <- &Message{Status: sc.status.String(), MsgType: -1}
+	log.Debugln("server ok connected to socket ... now entering accept loop")
+	go s.acceptClientConnectionsLoop()
+	//sc.received <- &Message{Status: sc.status.String(), MsgType: Internal}
 	//sc.connChannel = make(chan bool)
 
 	return nil
@@ -52,21 +53,22 @@ func (c *Client) dial() error {
 		if c.conf.Timeout != 0 {
 			if time.Since(startTime) > c.conf.Timeout {
 				c.status = Closed
-				return errors.New("timed out trying to connect")
+				return errors.New("client timed out trying to connect")
 			}
 		}
 
-		conn, err := net.Dial("unix", socketPath)
+		socketConnection, err := net.Dial("unix", socketPath)
 		if err != nil {
-			if strings.Contains(err.Error(), "connect: no such file or directory") {
-			} else if strings.Contains(err.Error(), "connect: connection refused") {
+			if strings.Contains(err.Error(), "client dial: no such file or directory") {
+			} else if strings.Contains(err.Error(), "client dial: connection refused") {
 			} else {
-				c.received <- &Message{Err: err, MsgType: -1}
+				c.incoming <- &Message{Err: err, MsgType: IpcInternal}
 			}
 		} else {
-			c.conn = conn
+			c.conn = socketConnection
 
-			err = c.handshake()
+			log.Debugln("client connected to server socket ... now waiting for server handshake")
+			err = c.clientHandshake()
 			if err != nil {
 				return err
 			}

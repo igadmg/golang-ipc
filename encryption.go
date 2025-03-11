@@ -12,7 +12,7 @@ import (
 	"net"
 )
 
-func (sc *Server) keyExchange() ([32]byte, error) {
+func (s *Server) keyExchange() ([32]byte, error) {
 	var shared [32]byte
 
 	priv, pub, err := generateKeys()
@@ -21,13 +21,13 @@ func (sc *Server) keyExchange() ([32]byte, error) {
 	}
 
 	// send servers public key
-	err = sendPublic(sc.conn, pub)
+	err = sendPublic(s.conn, pub)
 	if err != nil {
 		return shared, err
 	}
 
 	// received clients public key
-	pubRecvd, err := recvPublic(sc.conn)
+	pubRecvd, err := recvPublic(s.conn)
 	if err != nil {
 		return shared, err
 	}
@@ -38,7 +38,7 @@ func (sc *Server) keyExchange() ([32]byte, error) {
 	return shared, nil
 }
 
-func (cc *Client) keyExchange() ([32]byte, error) {
+func (c *Client) keyExchange() ([32]byte, error) {
 	var shared [32]byte
 
 	priv, pub, err := generateKeys()
@@ -47,13 +47,13 @@ func (cc *Client) keyExchange() ([32]byte, error) {
 	}
 
 	// received servers public key
-	pubRecvd, err := recvPublic(cc.conn)
+	pubRecvd, err := recvPublic(c.conn)
 	if err != nil {
 		return shared, err
 	}
 
 	// send clients public key
-	err = sendPublic(cc.conn, pub)
+	err = sendPublic(c.conn, pub)
 	if err != nil {
 		return shared, err
 	}
