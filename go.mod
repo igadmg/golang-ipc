@@ -1,6 +1,6 @@
 module github.com/igadmg/golang-ipc
 
-go 1.24.2
+go 1.25
 
 require github.com/Microsoft/go-winio v0.6.2
 
